@@ -62,15 +62,20 @@ function simulate_one_time_step!(image, t, trans_delays, x_transducers, pulse_le
   pix_coord = zeros(MVector{2})  # [m] space
   one_over_c = 1.0 / c  # For computation speed improvement [s/m]
 
+  num_transducers_firing = length(transducers_that_are_firing)
+  x_transducers_firing = zeros(num_transducers_firing)
+  trans_delays_firing = zeros(num_transducers_firing)
   for y in 1:spatial_res[2]
     pix_coord[2] = y * image_pitch[2]  # [m]
     for x in 1:spatial_res[1]
       pix_coord[1] = x * image_pitch[1]  # [m]
 
       # for transducers that will fire...
-      @inbounds for i_trans in transducers_that_are_firing
-        xt = x_transducers[i_trans]  # index
-        trans_delay = trans_delays[i_trans]
+      @inbounds x_transducers_firing[:] = x_transducers[transducers_that_are_firing]
+      @inbounds trans_delays_firing[:] = trans_delays[transducers_that_are_firing]
+      @inbounds @simd for i_trans = 1:length(transducers_that_are_firing)
+        xt = x_transducers_firing[i_trans]  # index
+        trans_delay = trans_delays_firing[i_trans]
         trans_coord[1] = xt
         trans_coord[2] = 0.0
         # from pixel to transducer
@@ -82,11 +87,14 @@ function simulate_one_time_step!(image, t, trans_delays, x_transducers, pulse_le
         time_to_transducer = dist_to_transducer * one_over_c
         time_to_reach = time_to_transducer + trans_delay
         # if the transducer wave reached this pixel...
-        if time_to_reach <= t <= time_to_reach + pulse_length
-          amp = pulse_shape_func((t - time_to_reach) * tx_frequency * 2pi) * wave_spreading_factor
-        else
-          amp = 0.0
-        end
+        #= if time_to_reach <= t <= time_to_reach + pulse_length =#
+        #=   amp = pulse_shape_func((t - time_to_reach) * tx_frequency * 2pi) * wave_spreading_factor =#
+        #= else =#
+        #=   amp = 0.0 =#
+        #= end =#
+        amp = ifelse(time_to_reach <= t <= time_to_reach + pulse_length,
+                     pulse_shape_func((t - time_to_reach) * tx_frequency * 2pi) * wave_spreading_factor,
+                     0.0)
         # wave interference
         image[x,y] += amp
       end
