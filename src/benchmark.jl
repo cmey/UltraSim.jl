@@ -1,4 +1,5 @@
 using BenchmarkTools
+using Parameters
 include("WaveSim.jl")
 using WaveSim
 
@@ -20,4 +21,11 @@ function main()
   return images, sim_params
 end
 
-display(@benchmark main())
+#= display(@benchmark main()) =#
+runtime = @btime main()
+@unpack aperture_size, transducer_pitch, spatial_res, temporal_res, end_simulation_time = sim_params
+flops = aperture_size / transducer_pitch * prod(spatial_res) * end_simulation_time / temporal_res
+
+print(flops)
+print(runtime)
+print(flops / runtime)
